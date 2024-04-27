@@ -1,3 +1,12 @@
+*   Allow `ActiveRecord::Base#pluck` to accept hash arguments with symbol and string values.
+
+    ```ruby
+    Post.joins(:comments).pluck(:id, comments: :id)
+    Post.joins(:comments).pluck("id", "comments" => "id")
+    ```
+
+    *Joshua Young*
+
 *   Deserialize binary data before decrypting
 
     This ensures that we call `PG::Connection.unescape_bytea` on PostgreSQL before decryption.

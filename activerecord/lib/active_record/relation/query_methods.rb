@@ -1933,17 +1933,44 @@ module ActiveRecord
         columns.flat_map do |field|
           case field
           when Symbol
-            arel_column(field.to_s) do |attr_name|
-              model.adapter_class.quote_table_name(attr_name)
-            end
+            arel_column_from_symbol(field)
           when String
-            arel_column(field, &:itself)
+            arel_column_from_string(field)
           when Proc
             field.call
           when Hash
             arel_columns_from_hash(field)
           else
             field
+          end
+        end
+      end
+
+      def arel_column_from_symbol(column)
+        arel_column(column.to_s) do |attr_name|
+          model.adapter_class.quote_table_name(attr_name)
+        end
+      end
+
+      def arel_column_from_string(column)
+        arel_column(column, &:itself)
+      end
+
+      def arel_columns_from_array(columns, table_name = model.table_name)
+        columns.map do |column|
+          arel_column("#{table_name}.#{column}", &:itself)
+        end
+      end
+
+      def arel_columns_from_hash(fields)
+        fields.flat_map do |table_name, columns|
+          case columns
+          when Array
+            arel_columns_from_array(columns, table_name)
+          when String
+            arel_column_from_string(columns)
+          when Symbol
+            arel_column_from_symbol(columns)
           end
         end
       end
@@ -2182,14 +2209,14 @@ module ActiveRecord
       def process_select_args(fields)
         fields.flat_map do |field|
           if field.is_a?(Hash)
-            arel_columns_from_hash(field)
+            arel_column_aliases_from_hash(field)
           else
             field
           end
         end
       end
 
-      def arel_columns_from_hash(fields)
+      def arel_column_aliases_from_hash(fields)
         fields.flat_map do |key, columns_aliases|
           case columns_aliases
           when Hash
