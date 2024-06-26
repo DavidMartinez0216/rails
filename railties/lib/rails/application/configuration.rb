@@ -337,6 +337,10 @@ module Rails
           end
         when "8.0"
           load_defaults "7.2"
+
+          if respond_to?(:action_view)
+            action_view.closes_form_tag_without_block = true
+          end
         else
           raise "Unknown version #{target_version.to_s.inspect}"
         end
