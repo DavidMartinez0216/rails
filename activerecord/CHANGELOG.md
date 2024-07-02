@@ -1,3 +1,13 @@
+*   Added option to validate which models are allowed to be associated to a polymorphic `belongs_to`.
+
+    Ex:
+    ```ruby
+    belongs_to :commentable, polymorphic: ["Post", "Comment"]
+    ```
+    This automatically adds an inclusion validator to commentable_type, to ensure that it's either Post or Comment.
+
+    *Nate Matykiewicz*
+
 *   Add condensed `#inspect` for `ConnectionPool`, `AbstractAdapter`, and
     `DatabaseConfig`.
 
