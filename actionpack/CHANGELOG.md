@@ -1,3 +1,7 @@
+*   Fix non-GET requests not updating cookies in `ActionController::TestCase`.
+
+    *Jon Moss*, *Hartley McGuire*
+
 *   Make `http_cache_forever` use `immutable: true`
 
     *Nate Matykiewicz*
