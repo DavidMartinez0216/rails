@@ -21,6 +21,8 @@ module ActionController
   #     # => ActionController::ParameterMissing: param is missing or the value is empty: b
   #     params.require(:a)
   #     # => ActionController::ParameterMissing: param is missing or the value is empty: a
+  #     params.expect(:a)
+  #     # => ActionController::ParameterMissing: param is missing or the value is empty: a
   class ParameterMissing < KeyError
     attr_reader :param, :keys # :nodoc:
 
@@ -78,9 +80,12 @@ module ActionController
   #
   # Allows you to choose which attributes should be permitted for mass updating
   # and thus prevent accidentally exposing that which shouldn't be exposed.
-  # Provides two methods for this purpose: #require and #permit. The former is
-  # used to mark parameters as required. The latter is used to set the parameter
-  # as permitted and limit which attributes should be allowed for mass updating.
+  #
+  # Provides methods for filtering and requiring params:
+  #
+  # *   `expect` to safely permit and require parameters in one step.
+  # *   `permit` to filter params for mass assignment.
+  # *   `require` to require a parameter or raise an error.
   #
   #     params = ActionController::Parameters.new({
   #       person: {
@@ -90,14 +95,14 @@ module ActionController
   #       }
   #     })
   #
-  #     permitted = params.require(:person).permit(:name, :age)
-  #     permitted            # => #<ActionController::Parameters {"name"=>"Francesco", "age"=>22} permitted: true>
-  #     permitted.permitted? # => true
+  #     permitted = params.expect(person: [:name, :age])
+  #     permitted # => #<ActionController::Parameters {"name"=>"Francesco", "age"=>22} permitted: true>
   #
   #     Person.first.update!(permitted)
   #     # => #<Person id: 1, name: "Francesco", age: 22, role: "user">
   #
-  # It provides two options that controls the top-level behavior of new instances:
+  # Paramaters provides two options that control the top-level behavior of new
+  # instances:
   #
   # *   `permit_all_parameters` - If it's `true`, all the parameters will be
   #     permitted by default. The default is `false`.
@@ -111,8 +116,6 @@ module ActionController
   #         DEBUG level.
   #     *   `:raise` to raise an ActionController::UnpermittedParameters
   #         exception.
-  #
-  #
   #
   # Examples:
   #
@@ -504,21 +507,23 @@ module ActionController
     #     user_params, profile_params = params.require([:user, :profile])
     #     # ActionController::ParameterMissing: param is missing or the value is empty: user
     #
-    # Technically this method can be used to fetch terminal values:
+    # This method is not recommended for fetching terminal values because it does
+    # not permit the values.
     #
     #     # CAREFUL
     #     params = ActionController::Parameters.new(person: { name: "Finn" })
     #     name = params.require(:person).require(:name) # CAREFUL
     #
-    # but take into account that at some point those ones have to be permitted:
+    # This can also cause problems
+    #
+    # It is recommended to use `expect` instead, or a mix of `expect` and `require`.
     #
     #     def person_params
-    #       params.require(:person).permit(:name).tap do |person_params|
-    #         person_params.require(:name) # SAFER
-    #       end
+    #       params.expect(:person: :name).expect(:name)
+    #       # which is also equivalent to
+    #       # params.expect(:person: :name).require(:name)
     #     end
     #
-    # for example.
     def require(key)
       return key.map { |k| require(k) } if key.is_a?(Array)
       value = self[key]
@@ -536,8 +541,8 @@ module ActionController
     # This is useful for limiting which attributes should be allowed for mass
     # updating.
     #
-    #     params = ActionController::Parameters.new(user: { name: "Francesco", age: 22, role: "admin" })
-    #     permitted = params.require(:user).permit(:name, :age)
+    #     params = ActionController::Parameters.new(name: "Francesco", age: 22, role: "admin")
+    #     permitted = params.permit(:name, :age)
     #     permitted.permitted?      # => true
     #     permitted.has_key?(:name) # => true
     #     permitted.has_key?(:age)  # => true
@@ -567,7 +572,7 @@ module ActionController
     # `permit` ensures values in the returned structure are permitted scalars and
     # filters out anything else.
     #
-    # You can also use `permit` on nested parameters, like:
+    # You can also use `permit` on nested parameters:
     #
     #     params = ActionController::Parameters.new({
     #       person: {
@@ -587,6 +592,29 @@ module ActionController
     #     permitted[:person][:pets][0][:name]     # => "Purplish"
     #     permitted[:person][:pets][0][:category] # => nil
     #
+    # This has the added benefit of rejecting user-modified inputs that send a
+    # string when a hash is expected.
+    #
+    # When followed by `require`, you can both filter and require parameters
+    # following the typical pattern of a Rails form. The `expect` method was
+    # made specifically for this use case and is the recommended way to require
+    # and permit parameters.
+    #
+    #      permitted = params.expect(person: [:name, :age])
+    #
+    # When using `permit` and `require` separately, pay careful attention to the
+    # order of the method calls.
+    #
+    #      params = ActionController::Parameters.new(person: { name: "Martin", age: 40, role: "admin" })
+    #      permitted = params.permit(person: [:name, :age]).require(:person) # correct
+    #
+    # When require is used first, it is possible for users of your application to
+    # trigger a NoMethodError when the user, for example, sends a string for :person.
+    #
+    #      params = ActionController::Parameters.new(person: "tampered")
+    #      permitted = params.require(:person).permit(:name, :age) # not recommended
+    #      # => NoMethodError: undefined method `permit' for an instance of String
+    #
     # Note that if you use `permit` in a key that points to a hash, it won't allow
     # all the hash. You also need to specify which attributes inside the hash should
     # be permitted.
@@ -600,13 +628,13 @@ module ActionController
     #       }
     #     })
     #
-    #     params.require(:person).permit(:contact)
+    #     params.permit(person: :contact).require(:person)
     #     # => #<ActionController::Parameters {} permitted: true>
     #
-    #     params.require(:person).permit(contact: :phone)
+    #     params.permit(person: { contact: :phone }).require(:person)
     #     # => #<ActionController::Parameters {"contact"=>#<ActionController::Parameters {"phone"=>"555-1234"} permitted: true>} permitted: true>
     #
-    #     params.require(:person).permit(contact: [ :email, :phone ])
+    #     params.permit(person: { contact: [ :email, :phone ] }).require(:person)
     #     # => #<ActionController::Parameters {"contact"=>#<ActionController::Parameters {"email"=>"none@test.com", "phone"=>"555-1234"} permitted: true>} permitted: true>
     #
     # If your parameters specify multiple parameters indexed by a number, you can
@@ -646,20 +674,114 @@ module ActionController
     #     params.permit(person: { '0': [:email], '1': [:phone]}).to_h
     #     # => {"person"=>{"0"=>{"email"=>"none@test.com"}, "1"=>{"phone"=>"555-6789"}}}
     def permit(*filters)
-      params = self.class.new
+      permit_filters(filters)
+    end
 
-      filters.flatten.each do |filter|
-        case filter
-        when Symbol, String
-          permitted_scalar_filter(params, filter)
-        when Hash
-          hash_filter(params, filter)
-        end
-      end
-
-      unpermitted_parameters!(params) if self.class.action_on_unpermitted_parameters
-
-      params.permit!
+    # `expect` is the preferred way to require and permit parameters.
+    # It safer than the previous recommendation to call `permit` and `require`
+    # in sequence, which could allow user triggered 500 errors.
+    #
+    # `expect` is more strict with types to avoid a number potential pitfalls
+    # that may be encountered with the `.require.permit` pattern.
+    #
+    # For example:
+    #
+    #     params = ActionController::Parameters.new(comment: { text: "hello" })
+    #     params.expect(comment: [:text])
+    #     # => #<ActionController::Parameters { text: "hello" } permitted: true>
+    #
+    #     params = ActionController::Parameters.new(comment: [{ text: "hello" }, { text: "world" }])
+    #     params.expect(comment: [:text])
+    #     # => ActionController::ParameterMissing: param is missing or the value is empty: comment
+    #
+    # In order to permit an array of parameters, the array must be defined
+    # explicitly. Use double array brackets, an array inside an array, to
+    # declare that an array of parameters is expected.
+    #
+    #     params = ActionController::Parameters.new(comment: [{ text: "hello" }, { text: "world" }])
+    #     params.expect(comments: [[:text]])
+    #     # => [#<ActionController::Parameters { "text" => "hello" } permitted: true>,
+    #     #     #<ActionController::Parameters { "text" => "world" } permitted: true>]
+    #
+    #     params = ActionController::Parameters.new(comment: { text: "hello" })
+    #     params.expect(comments: [[:text]])
+    #     # => ActionController::ParameterMissing: param is missing or the value is empty: comments
+    #
+    # `expect` is intended to protect against array tampering.
+    #
+    #     params = ActionController::Parameters.new(user: "hack")
+    #     # The previous way of requiring and permitting parameters will error
+    #     params.require(:user).permit(:name, pets: [:name]) # wrong
+    #     # => NoMethodError: undefined method `permit' for an instance of String
+    #
+    #     # similarly with nested parameters
+    #     params = ActionController::Parameters.new(user: { name: "Martin", pets: { name: "hack" } })
+    #     user_params = params.require(:user).permit(:name, pets: [:name]) # wrong
+    #     # user_params[:pets] is expected to be an array but is a hash
+    #
+    # `expect` solves this by being more strict with types.
+    #
+    #     params = ActionController::Parameters.new(user: "hack")
+    #     params.expect(user: [ :name, pets: [[:name]] ])
+    #     # => ActionController::ParameterMissing: param is missing or the value is empty: user
+    #
+    #     # with nested parameters
+    #     params = ActionController::Parameters.new(user: { name: "Martin", pets: { name: "hack" } })
+    #     user_params = params.expect(user: [:name, pets: [[:name]] ])
+    #     user_params[:pets] # => []
+    #
+    # As the examples show, `expect` requires the `:user` key, and any root keys
+    # similarl to the `.require.permit` pattern. If multiple root keys are
+    # expected, they will all be required.
+    #
+    #    params = ActionController::Parameters.new(name: "Martin", pies: [{ type: "dessert", flavor: "pumpkin"}])
+    #    name, pies = params.expect(:name, pies: [:type, :flavor])
+    #    name # => "Martin"
+    #    pies # => #<ActionController::Parameters {"type"=>"dessert", "flavor"=>"pumpkin"} permitted: true>
+    #
+    # When called with a hash with multiple keys, `expect` will permit the
+    # parameters and require the keys in the order they are given in the hash,
+    # returning an array of the permitted parameters.
+    #
+    #    params = ActionController::Parameters.new(subject: { name: "Martin" }, object: { pie: "pumpkin" })
+    #    subject, object = params.expect(subject: [:name], object: [:pie])
+    #    subject # => #<ActionController::Parameters {"name"=>"Martin"} permitted: true>
+    #    object  # => #<ActionController::Parameters {"pie"=>"pumpkin"} permitted: true>
+    #
+    # Besidse being more strict about array vs hash params, `expect` uses permit
+    # internally, so it will behave similarly.
+    #
+    #     params = ActionController::Parameters.new({
+    #       person: {
+    #         name: "Francesco",
+    #         age:  22,
+    #         pets: [{
+    #           name: "Purplish",
+    #           category: "dogs"
+    #         }]
+    #       }
+    #     })
+    #
+    #     permitted = params.expect(person: [ :name, { pets: [[:name]] } ])
+    #     permitted.permitted?           # => true
+    #     permitted[:name]               # => "Francesco"
+    #     permitted[:age]                # => nil
+    #     permitted[:pets][0][:name]     # => "Purplish"
+    #     permitted[:pets][0][:category] # => nil
+    #
+    # An array of permitted scalars may be expected with the following:
+    #
+    #     params = ActionController::Parameters.new(tags: ["rails", "parameters"])
+    #     permitted = params.expect(tags: [])
+    #     permitted.permitted?      # => true
+    #     permitted.is_a?(Array)    # => true
+    #     permitted.size            # => 2
+    #
+    def expect(*filters)
+      params = permit_filters(filters, check_unpermitted: false, explicit_arrays: true)
+      keys = filters.flatten.flat_map { |f| f.is_a?(Hash) ? f.keys : f }
+      values = params.require(keys)
+      values.size == 1 ? values.first : values
     end
 
     # Returns a parameter for the given `key`. If not found, returns `nil`.
@@ -999,6 +1121,29 @@ module ActionController
         hash
       end
 
+      # Filters params given the set of filters.
+      def permit_filters(filters, check_unpermitted: true, explicit_arrays: false)
+        params = self.class.new
+
+        filters.flatten.each do |filter|
+          case filter
+          when Symbol, String
+            # Declaration [:name, "age"]
+            permitted_scalar_filter(params, filter)
+          when Hash
+            # Declaration [{ person: ... }]
+            hash_filter(params, filter, explicit_arrays: explicit_arrays)
+          end
+        end
+
+        if check_unpermitted
+          unpermitted = unpermitted_keys(params)
+          unpermitted_parameters(unpermitted) unless unpermitted.empty?
+        end
+
+        params.permit!
+      end
+
     private
       def new_instance_with_inherited_permitted_status(hash)
         self.class.new(hash, @logging_context).tap do |new_instance|
@@ -1088,34 +1233,52 @@ module ActionController
         end
       end
 
-      def each_element(object, filter, &block)
+      # When an array is expected, you must specify an array explicitly
+      # using the following format:
+      #
+      #     params.expect(comments: [[:flavor]])
+      #
+      # Which will match only the following array formats:
+      #
+      #     { pies: [{ flavor: "rhubarb" }, { flavor: "apple" }] }
+      #     { pies: { "0" => { flavor: "key lime" }, "1" =>  { flavor: "mince" } } }
+      #
+      # Previously, arrays were specified the same way as hashes:
+      #
+      #     params.expect(pies: [:flavor])
+      #
+      # which would also allow matching with a hash (or vice versa):
+      #
+      #     { pies: { flavor: "cherry" } }
+      #
+      def array_filter?(filter)
+        filter.is_a?(Array) && filter.size == 1 && filter.first.is_a?(Array)
+      end
+
+      # Called when an explicit array filter is encountered.
+      def each_array_element(object, filter, &block)
         case object
         when Array
           object.grep(Parameters).filter_map(&block)
         when Parameters
           if object.nested_attributes? && !specify_numeric_keys?(filter)
             object.each_nested_attribute(&block)
-          else
-            yield object
-          end
-        end
-      end
-
-      def unpermitted_parameters!(params)
-        unpermitted_keys = unpermitted_keys(params)
-        if unpermitted_keys.any?
-          case self.class.action_on_unpermitted_parameters
-          when :log
-            name = "unpermitted_parameters.action_controller"
-            ActiveSupport::Notifications.instrument(name, keys: unpermitted_keys, context: @logging_context)
-          when :raise
-            raise ActionController::UnpermittedParameters.new(unpermitted_keys)
           end
         end
       end
 
       def unpermitted_keys(params)
         keys - params.keys - always_permitted_parameters
+      end
+
+      def unpermitted_parameters(unpermitted_keys)
+        case self.class.action_on_unpermitted_parameters
+        when :log
+          name = "unpermitted_parameters.action_controller"
+          ActiveSupport::Notifications.instrument(name, keys: unpermitted_keys, context: @logging_context)
+        when :raise
+          raise ActionController::UnpermittedParameters.new(unpermitted_keys)
+        end
       end
 
       #
@@ -1174,43 +1337,61 @@ module ActionController
         end
       end
 
-      def array_of_permitted_scalars?(value)
-        if value.is_a?(Array) && value.all? { |element| permitted_scalar?(element) }
-          yield value
-        end
-      end
-
       def non_scalar?(value)
         value.is_a?(Array) || value.is_a?(Parameters)
       end
 
       EMPTY_ARRAY = [] # :nodoc:
       EMPTY_HASH  = {} # :nodoc:
-      def hash_filter(params, filter)
+      def hash_filter(params, filter, explicit_arrays: false)
         filter = filter.with_indifferent_access
 
         # Slicing filters out non-declared keys.
         slice(*filter.keys).each do |key, value|
           next unless value
           next unless has_key? key
-
-          if filter[key] == EMPTY_ARRAY
-            # Declaration { comment_ids: [] }.
-            array_of_permitted_scalars?(self[key]) do |val|
-              params[key] = val
-            end
-          elsif filter[key] == EMPTY_HASH
-            # Declaration { preferences: {} }.
-            if value.is_a?(Parameters)
-              params[key] = permit_any_in_parameters(value)
-            end
-          elsif non_scalar?(value)
-            # Declaration { user: :name } or { user: [:name, :age, { address: ... }] }.
-            params[key] = each_element(value, filter[key]) do |element|
-              element.permit(*Array.wrap(filter[key]))
-            end
-          end
+          result = permit_value(value, filter[key], explicit_arrays: explicit_arrays)
+          params[key] = result unless result.nil?
         end
+      end
+
+      def permit_value(value, filter, explicit_arrays:)
+        if filter == EMPTY_ARRAY # Declaration { comment_ids: [] }.
+          permit_array_of_scalars(value)
+        elsif filter == EMPTY_HASH # Declaration { preferences: {} }.
+          permit_hash(value, filter, explicit_arrays: explicit_arrays)
+        elsif array_filter?(filter) # Declaration { comments: [[:text]] }
+          permit_array_of_hashes(value, filter.first, explicit_arrays: explicit_arrays)
+        elsif explicit_arrays # Declaration { user: { address: ... } } or { user: [:name, ...] } (only allows hash value)
+          permit_hash(value, filter, explicit_arrays: explicit_arrays)
+        elsif non_scalar?(value) # Declaration { user: { address: ... } } or { user: [:name, ...] } (allows array or hash)
+          permit_hash_or_array(value, filter, explicit_arrays: explicit_arrays)
+        end
+      end
+
+      def permit_array_of_scalars(value)
+        value if value.is_a?(Array) && value.all? { |element| permitted_scalar?(element) }
+      end
+
+      def permit_array_of_hashes(value, filter, explicit_arrays:)
+        each_array_element(value, filter) do |element|
+          element.permit_filters(Array.wrap(filter), explicit_arrays: explicit_arrays)
+        end
+      end
+
+      def permit_hash(value, filter, explicit_arrays:)
+        return unless value.is_a?(Parameters)
+
+        if filter == EMPTY_HASH
+          permit_any_in_parameters(value)
+        else
+          value.permit_filters(Array.wrap(filter), explicit_arrays:)
+        end
+      end
+
+      def permit_hash_or_array(value, filter, explicit_arrays:)
+        permit_array_of_hashes(value, filter, explicit_arrays: explicit_arrays) ||
+         permit_hash(value, filter, explicit_arrays: explicit_arrays)
       end
 
       def permit_any_in_parameters(params)
@@ -1287,7 +1468,7 @@ module ActionController
   #         # list between create and update. Also, you can specialize this method
   #         # with per-user checking of permissible attributes.
   #         def person_params
-  #           params.require(:person).permit(:name, :age)
+  #           params.expect(person: [:name, :age])
   #         end
   #     end
   #
@@ -1314,11 +1495,12 @@ module ActionController
   #           # It's mandatory to specify the nested attributes that should be permitted.
   #           # If you use `permit` with just the key that points to the nested attributes hash,
   #           # it will return an empty hash.
-  #           params.require(:person).permit(:name, :age, pets_attributes: [ :id, :name, :category ])
+  #           params.expect(person: [ :name, :age, pets_attributes: [ :id, :name, :category ] ])
   #         end
   #     end
   #
-  # See ActionController::Parameters.require and
+  # See ActionController::Parameters.expect,
+  # See ActionController::Parameters.require, and
   # ActionController::Parameters.permit for more information.
   module StrongParameters
     # Returns a new ActionController::Parameters object that has been instantiated
