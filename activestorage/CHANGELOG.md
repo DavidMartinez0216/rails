@@ -1,3 +1,9 @@
+*   Add support for multiple databases for Action Storage.
+
+    `config.active_storage.connects_to = { writing: :primary, reading: :primary_replica }`
+
+    *Matthew Nguyen*
+
 *   Improve `ActiveStorage::Filename#sanitized` method to handle special characters more effectively.
     Replace the characters `"*?<>` with `-` if they exist in the Filename to match the Filename convention of Win OS.
 
