@@ -116,7 +116,11 @@ module ActionDispatch # :nodoc:
       end
 
       def to_ary
-        @buf.to_ary
+        if @str_body
+          [body]
+        else
+          @buf = @buf.to_ary
+        end
       end
 
       def body
