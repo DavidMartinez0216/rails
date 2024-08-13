@@ -652,4 +652,17 @@ class ResponseIntegrationTest < ActionDispatch::IntegrationTest
     assert_equal("utf-8", @response.charset)
     assert_equal("012345678910", @response.body)
   end
+
+  test "response does not buffer enumerator body" do
+    # This is an enumerable body, and it should not be buffered:
+    body = Enumerator.new do |enumerator|
+      enumerator << "Hello World"
+    end
+
+    # The response created here should not attempt to buffer the body:
+    response = ActionDispatch::Response.new(200, { "content-type" => "text/plain" }, body)
+
+    # The body should be the same enumerator object, i.e. it should be passed through unchanged:
+    assert_equal body, response.body
+  end
 end
