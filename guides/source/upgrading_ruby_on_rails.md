@@ -1935,7 +1935,7 @@ The [`TagAssertions` module](https://api.rubyonrails.org/v4.1/classes/ActionDisp
 
 ### Masked Authenticity Tokens
 
-In order to mitigate TLS attacks, `form_authenticity_token` is now masked so that it varies with each request.  Thus, tokens are validated by unmasking and then decrypting. As a result, any strategies for verifying requests from non-rails forms that relied on a static session CSRF token have to take this into account.
+In order to mitigate TLS attacks, `form_authenticity_token` is now masked so that it varies with each request. Thus, tokens are validated by unmasking and then decrypting. As a result, any strategies for verifying requests from non-rails forms that relied on a static session CSRF token have to take this into account.
 
 ### Action Mailer
 
