@@ -226,6 +226,9 @@ module Rails
       class_option :api,          type: :boolean, default: false,
                                   desc: "Generate a smaller stack for API application plugins"
 
+      class_option :duplicate_plugin, type: :boolean, default: false,
+                   desc: "Allow duplicate plugin names."
+
       def initialize(*args)
         @dummy_path = nil
         super
@@ -386,6 +389,10 @@ module Rails
         options[:skip_git]
       end
 
+      def duplicate_plugin?
+        options[:duplicate_plugin]
+      end
+
       def with_dummy_app?
         options[:skip_test].blank? || options[:dummy_path] != "test/dummy"
       end
@@ -460,7 +467,7 @@ module Rails
           raise Error, "Invalid plugin name #{original_name}. Please give a " \
                        "name which does not match one of the reserved rails " \
                        "words: #{RESERVED_NAMES.join(", ")}"
-        elsif Object.const_defined?(camelized)
+        elsif Object.const_defined?(camelized) && !duplicate_plugin?
           raise Error, "Invalid plugin name #{original_name}, constant #{camelized} is already in use. Please choose another plugin name."
         end
       end
