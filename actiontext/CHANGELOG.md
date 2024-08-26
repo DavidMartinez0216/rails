@@ -1,3 +1,7 @@
+*   Clear embeds when emptying an `ActionText::RichText`.
+
+    *Joé Dupuis*
+
 *   Add `store_if_blank` option to `has_rich_text`
 
     Pass `store_if_blank: false` to not create `ActionText::RichText` records when saving with a blank attribute, such as from an optional form parameter.
