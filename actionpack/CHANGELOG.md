@@ -1,3 +1,7 @@
+*   Update `ActionController::Live` to use a thread-pool to reuse threads across requests.
+
+    *Adam Renberg Tamm*
+
 *   Fix `Request#raw_post` raising `NoMethodError` when `rack.input` is `nil`.
 
     *Hartley McGuire*
