@@ -1,3 +1,7 @@
+*   Raise an `ArgumentError` when invalid `:on` or `:except` options are passed into `#resource` and `#resources`.
+
+    *Joshua Young*
+
 *   Fix `Request#raw_post` raising `NoMethodError` when `rack.input` is `nil`.
 
     *Hartley McGuire*
