@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "benchmark"
 require "set"
 require "zlib"
 require "active_support/core_ext/array/access"
@@ -976,16 +975,16 @@ module ActiveRecord
       when :down then announce "reverting"
       end
 
-      time = nil
+      time_elapsed = nil
       ActiveRecord::Tasks::DatabaseTasks.migration_connection.pool.with_connection do |conn|
-        time = Benchmark.measure do
-          exec_migration(conn, direction)
-        end
+        time_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        exec_migration(conn, direction)
+        time_elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start
       end
 
       case direction
-      when :up   then announce "migrated (%.4fs)" % time.real; write
-      when :down then announce "reverted (%.4fs)" % time.real; write
+      when :up   then announce "migrated (%.4fs)" % time_elapsed; write
+      when :down then announce "reverted (%.4fs)" % time_elapsed; write
       end
     end
 
@@ -1025,9 +1024,10 @@ module ActiveRecord
     # If the block returns an integer it assumes it is the number of rows affected.
     def say_with_time(message)
       say(message)
-      result = nil
-      time = Benchmark.measure { result = yield }
-      say "%.4fs" % time.real, :subitem
+      time_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      result = yield
+      time_elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start
+      say "%.4fs" % time_elapsed, :subitem
       say("#{result} rows", :subitem) if result.is_a?(Integer)
       result
     end

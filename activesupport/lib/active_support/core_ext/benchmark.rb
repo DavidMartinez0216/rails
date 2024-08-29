@@ -3,14 +3,12 @@
 require "benchmark"
 
 class << Benchmark
-  # Benchmark realtime in milliseconds.
-  #
-  #   Benchmark.realtime { User.all }
-  #   # => 8.0e-05
-  #
-  #   Benchmark.ms { User.all }
-  #   # => 0.074
-  def ms(&block)
+  def ms(&block) # :nodoc
+    # NOTE: Please also remove the Active Support `benchmark` dependency when removing this
+    ActiveSupport.deprecator.warn <<~TEXT
+      `Benchmark.ms` is deprecated and will be removed in Rails 8.1.
+      Use `1000 * Benchmark.realtime(&block)` instead.
+    TEXT
     1000 * realtime(&block)
   end
 end

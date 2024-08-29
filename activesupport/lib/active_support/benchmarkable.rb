@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "active_support/core_ext/benchmark"
 require "active_support/core_ext/hash/keys"
 
 module ActiveSupport
@@ -40,9 +39,11 @@ module ActiveSupport
         options.assert_valid_keys(:level, :silence)
         options[:level] ||= :info
 
-        result = nil
-        ms = Benchmark.ms { result = options[:silence] ? logger.silence(&block) : yield }
-        logger.public_send(options[:level], "%s (%.1fms)" % [ message, ms ])
+        time_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        result = options[:silence] ? logger.silence(&block) : yield
+        time_elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start
+
+        logger.public_send(options[:level], "%s (%.1fms)" % [ message, time_elapsed * 1000 ])
         result
       else
         yield
