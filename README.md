@@ -1,4 +1,4 @@
-# Welcome to Rails 2
+# Welcome to Rails 3
 
 ## What's Rails?
 
