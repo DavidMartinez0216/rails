@@ -1,3 +1,9 @@
+*   Deprecate `Benchmark.ms` core extension.
+
+    You can simply use `Benchmark.realtime * 1000` and add `benchmark` to your own Gemfile.
+
+    *Earlopain*
+
 *   `ActiveSupport::ErrorReporter#report` now assigns a backtrace to unraised exceptions.
 
     Previously reporting an un-raised exception would result in an error report without

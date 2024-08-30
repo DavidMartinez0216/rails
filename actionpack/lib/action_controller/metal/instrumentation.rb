@@ -2,7 +2,6 @@
 
 # :markup: markdown
 
-require "benchmark"
 require "abstract_controller/logger"
 
 module ActionController
@@ -29,7 +28,10 @@ module ActionController
     def render(*)
       render_output = nil
       self.view_runtime = cleanup_view_runtime do
-        Benchmark.ms { render_output = super }
+        time_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        render_output = super
+        time_elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start
+        time_elapsed * 1000
       end
       render_output
     end
