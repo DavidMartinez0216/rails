@@ -1,3 +1,10 @@
+*   Add support for combining predefined variations
+
+    Sometimes you will want to combine predefined variants, like rotate a thumb:
+    `@user.avatar.variant(:thumb, rotate: 90)`
+
+    *Marek de Heus*
+
 *   Improve `ActiveStorage::Filename#sanitized` method to handle special characters more effectively.
     Replace the characters `"*?<>` with `-` if they exist in the Filename to match the Filename convention of Win OS.
 
