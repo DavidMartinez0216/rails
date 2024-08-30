@@ -102,7 +102,7 @@ gem "jquery-rails"
     # config.assets.precompile `= %w( admin.js admin.css )
 
 
-    # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
+    # Force all access to the app over TLS, use Strict-Transport-Security, and use secure cookies.
     # config.force_ssl = true
     ```
 
